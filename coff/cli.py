@@ -8,14 +8,19 @@ import dateutil.parser
 
 @click.group()
 @click.option('--docid', type=int)
+@click.option('--store-config', type=bool, default=False, is_flag=True)
 @click.pass_context
-def cli(ctx, docid):
+def cli(ctx, docid, store_config):
+    yfn = "confluence.yaml"
+
     if docid is None:
-        yfn = "confluence.yaml"
         docid = yaml.load(open(yfn))['docid']
         click.echo("loading docid from {yfn}: {docid}".format(yfn=yfn, docid=docid))
 
     ctx.obj['docid'] = docid
+
+    if store_config:
+        yaml.dump(dict(docid=docid), open(yfn, "wt"))
 
 def get_auth():
     username = keyring.get_password("issues-cosmos", "username")
