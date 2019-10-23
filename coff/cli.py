@@ -1,5 +1,5 @@
-
 import re
+import yaml
 import json
 import requests
 import click
@@ -10,6 +10,11 @@ import dateutil.parser
 @click.option('--docid', type=int)
 @click.pass_context
 def cli(ctx, docid):
+    if docid is None:
+        yfn = "confluence.yaml"
+        docid = yaml.load(open(yfn))['docid']
+        click.echo("loading docid from {yfn}: {docid}".format(yfn=yfn, docid=docid))
+
     ctx.obj['docid'] = docid
 
 def get_auth():
@@ -93,5 +98,9 @@ def versions(ctx):
 
     click.echo(last_version)
 
-if __name__ == "__main__":
+def main():
     cli(obj={})
+
+if __name__ == "__main__":
+    main()
+
