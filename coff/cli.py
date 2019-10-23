@@ -41,8 +41,8 @@ def push(ctx, commit):
     r=requests.get("https://issues.cosmos.esa.int/socciwiki/rest/api/content/{docid}?expand=body.storage,version".format(docid=ctx.obj['docid']), auth=get_auth())
 
     last_version = r.json()['version']
-    print(last_version['by']['displayName'])
-    print(last_version['when'])
+    click.echo(last_version['by']['displayName'])
+    click.echo(last_version['when'])
 
     body = r.json()['body']
 
@@ -76,7 +76,7 @@ def push(ctx, commit):
                         data=json.dumps(data),
                         auth=get_auth())
 
-        print(r,r.text)
+        click.echo(r.text)
 
 @cli.command()
 def history():
