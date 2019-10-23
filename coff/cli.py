@@ -94,9 +94,8 @@ def versions(ctx):
                     auth=get_auth(),
                     headers=headers)
 
-    last_version = r.json()['results'][0]
-
-    click.echo(last_version)
+    for version in r.json()['results']:
+        click.echo((version['number'], version['by']['displayName'], version['when']))
 
 def main():
     cli(obj={})
