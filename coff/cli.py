@@ -56,13 +56,15 @@ def push(ctx, commit):
 
     body['storage']['value'] = updated_body
 
+    commit_message = "metadata sync"
+
     headers = {
        "Accept": "application/json",
        "Content-Type": "application/json"
     }
                     
     data = dict(
-                version=dict(number=last_version['number']+1),
+                version=dict(number=last_version['number']+1, minorEdit=True, message=commit_message),
                 title=r.json()['title'],
                 type="page",
                 body=body,
