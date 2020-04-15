@@ -6,6 +6,16 @@ import click
 import keyring
 import dateutil.parser
 
+import subprocess
+    
+
+def get_git_reference():
+    try:
+        return (subprocess.check_output(["git", "remote", "get-url", "origin"]).decode().strip(),
+                subprocess.check_output(["git", "describe", "--tags", "--always"]).decode().strip())
+    except Exception as e:
+        click.echo("failed to get git reference: %s"%repr(e))
+
 @click.group()
 @click.option('--docid', type=int)
 @click.option('--store-config', type=bool, default=False, is_flag=True)
@@ -56,6 +66,11 @@ def push(ctx, commit):
     dt = dateutil.parser.parse(last_version['when'])
 
     updated_body = re.sub("(\|\| updated \|)(.*?)\|","\\1 "+dt.strftime("%Y/%m/%d")+" |", body_storage)
+    
+    git_remote, git_reference = get_git_reference()
+
+    if git_reference is not None:
+        updated_body = re.sub("(\|\| AKA \|)(.*?)\|","\\1 " + git_remote +  " @ "+git_reference+" |", updated_body)
 
     click.echo(updated_body)
 
