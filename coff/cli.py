@@ -5,6 +5,7 @@ import requests
 import click
 import keyring
 import dateutil.parser
+import html2text
 
 import subprocess
     
@@ -42,12 +43,16 @@ def get_auth():
 
 @cli.command()
 @click.pass_context
-def pull(ctx):
+@click.option("--text", type=bool, default=True)
+def pull(ctx, text):
     r=requests.get("https://issues.cosmos.esa.int/socciwiki/rest/api/content/{docid}?expand=body.storage".format(docid=ctx.obj['docid']), auth=get_auth())
 
     body = r.json()['body']['storage']['value']
 
     open("main.xhtml", "wt").write(body)
+
+    if text:
+        open("main.txt", "wt").write(html2text.html2text(body))
 
 @cli.command()
 @click.option('--commit', type=bool, default=False, is_flag=True)
