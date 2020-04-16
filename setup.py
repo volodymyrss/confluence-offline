@@ -15,5 +15,5 @@ __version__ = mod.body[-1].value.s
 
 setup(description=__doc__.splitlines()[1],
       long_description=__doc__,
-      version = '0.1.3', 
+      version = '0.1.4-dev0', 
       setup_requires=setup_requires)
