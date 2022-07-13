@@ -1,3 +1,4 @@
+import logging
 import re
 import yaml
 import json
@@ -6,8 +7,13 @@ import click
 import keyring
 import dateutil.parser
 import html2text
+# import dynaconf
+
+# dynaconf.Dynaconf()
 
 import subprocess
+
+logging.basicConfig(level="INFO")
     
 
 def get_git_reference():
@@ -24,28 +30,45 @@ def get_git_reference():
 def cli(ctx, docid, store_config):
     yfn = "confluence.yaml"
 
+    cfg = yaml.load(open(yfn), Loader=yaml.SafeLoader)
+
     if docid is None:
-        docid = yaml.load(open(yfn))['docid']
+        docid = cfg['docid']
         click.echo("loading docid from {yfn}: {docid}".format(yfn=yfn, docid=docid))
 
+    for k, v in cfg.items():
+        ctx.obj[k] = v
+
     ctx.obj['docid'] = docid
+    ctx.obj['base_url'] = cfg.get('base_url', 'https://issues.cosmos.esa.int/socciwiki/rest/api')
 
     if store_config:
         yaml.dump(dict(docid=docid), open(yfn, "wt"))
 
-def get_auth():
-    username = keyring.get_password("issues-cosmos", "username")
+def get_auth(site="issues-cosmos"):
+    logging.info("will find username for site %s", site)
+    username = keyring.get_password(site, "username")
+
+    logging.info("will find password for user %s", username)
 
     return requests.auth.HTTPBasicAuth(
                 username,
-                keyring.get_password("issues-cosmos", username),
+                keyring.get_password(site, username),
             )
 
 @cli.command()
 @click.pass_context
 @click.option("--text", type=bool, default=True)
 def pull(ctx, text):
-    r=requests.get("https://issues.cosmos.esa.int/socciwiki/rest/api/content/{docid}?expand=body.storage".format(docid=ctx.obj['docid']), auth=get_auth())
+    headers = {
+       "Authorization": f"Bearer {keyring.get_password(ctx.obj['site'], 'pat')}"
+    }
+
+    r = requests.get("{base_url}/content/{docid}?expand=body.storage".format(
+                        base_url=ctx.obj['base_url'], 
+                        docid=ctx.obj['docid']), 
+                #    auth=get_auth(ctx.obj['site']),
+                   headers=headers)
 
     body = r.json()['body']['storage']['value']
 
@@ -58,7 +81,7 @@ def pull(ctx, text):
 @click.option('--commit', type=bool, default=False, is_flag=True)
 @click.pass_context
 def push(ctx, commit):
-    r=requests.get("https://issues.cosmos.esa.int/socciwiki/rest/api/content/{docid}?expand=body.storage,version".format(docid=ctx.obj['docid']), auth=get_auth())
+    r = requests.get("https://issues.cosmos.esa.int/socciwiki/rest/api/content/{docid}?expand=body.storage,version".format(docid=ctx.obj['docid']), auth=get_auth())
 
     last_version = r.json()['version']
     click.echo(last_version['by']['displayName'])
@@ -85,7 +108,8 @@ def push(ctx, commit):
 
     headers = {
        "Accept": "application/json",
-       "Content-Type": "application/json"
+       "Content-Type": "application/json",
+       "Authorization": f"Bearer {keyring.get_password(site)}"
     }
                     
     data = dict(
