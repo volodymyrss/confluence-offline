@@ -12,9 +12,8 @@ import html2text
 # dynaconf.Dynaconf()
 
 import subprocess
-
-logging.basicConfig(level="INFO")
     
+logger = logging.getLogger(__name__)
 
 def get_git_reference():
     try:
@@ -24,10 +23,16 @@ def get_git_reference():
         click.echo("failed to get git reference: %s"%repr(e))
 
 @click.group()
+@click.option('-d', '--debug', is_flag=True)
 @click.option('--docid', type=int)
 @click.option('--store-config', type=bool, default=False, is_flag=True)
 @click.pass_context
-def cli(ctx, docid, store_config):
+def cli(ctx, debug, docid, store_config):
+    if debug:
+        logging.basicConfig(level="DEBUG")
+    else:
+        logging.basicConfig(level="INFO")
+
     yfn = "confluence.yaml"
 
     cfg = yaml.load(open(yfn), Loader=yaml.SafeLoader)
@@ -56,19 +61,26 @@ def get_auth(site="issues-cosmos"):
                 keyring.get_password(site, username),
             )
 
+
+def get_headers(ctx):
+    return {
+       "Authorization": f"Bearer {keyring.get_password(ctx.obj['site'], 'pat')}",
+       "Accept": "application/json",
+       "Content-Type": "application/json",
+    }
+
+
 @cli.command()
 @click.pass_context
 @click.option("--text", type=bool, default=True)
 def pull(ctx, text):
-    headers = {
-       "Authorization": f"Bearer {keyring.get_password(ctx.obj['site'], 'pat')}"
-    }
-
+        
     r = requests.get("{base_url}/content/{docid}?expand=body.storage".format(
-                        base_url=ctx.obj['base_url'], 
-                        docid=ctx.obj['docid']), 
-                #    auth=get_auth(ctx.obj['site']),
-                   headers=headers)
+                      base_url=ctx.obj['base_url'], 
+                      docid=ctx.obj['docid']), 
+                      headers=get_headers(ctx))
+
+    logger.warning("%s: %s", r, r.text)
 
     body = r.json()['body']['storage']['value']
 
@@ -77,15 +89,21 @@ def pull(ctx, text):
     if text:
         open("main.txt", "wt").write(html2text.html2text(body))
 
+
 @cli.command()
 @click.option('--commit', type=bool, default=False, is_flag=True)
+@click.option('-m', '--message', type=str)
 @click.pass_context
-def push(ctx, commit):
-    r = requests.get("https://issues.cosmos.esa.int/socciwiki/rest/api/content/{docid}?expand=body.storage,version".format(docid=ctx.obj['docid']), auth=get_auth())
+def push(ctx, commit, message):
+                  
+    r = requests.get(f"{ctx.obj['base_url']}/content/{ctx.obj['docid']}?expand=body.storage,version",
+                     headers=get_headers(ctx))
+
+    logger.info("response: %s %s", r, r.text)
 
     last_version = r.json()['version']
-    click.echo(last_version['by']['displayName'])
-    click.echo(last_version['when'])
+    logger.info("last version: %s", last_version['by']['displayName'])
+    logger.info("            : %s", last_version['when'])
 
     body = r.json()['body']
 
@@ -104,14 +122,8 @@ def push(ctx, commit):
 
     body['storage']['value'] = updated_body
 
-    commit_message = "metadata sync"
-
-    headers = {
-       "Accept": "application/json",
-       "Content-Type": "application/json",
-       "Authorization": f"Bearer {keyring.get_password(site)}"
-    }
-                    
+    commit_message = message
+     
     data = dict(
                 version=dict(number=last_version['number']+1, minorEdit=True, message=commit_message),
                 title=r.json()['title'],
@@ -120,10 +132,9 @@ def push(ctx, commit):
             )
     
     if commit:
-        r=requests.put("https://issues.cosmos.esa.int/socciwiki/rest/api/content/{docid}".format(docid=ctx.obj['docid']), 
-                        headers=headers,
-                        data=json.dumps(data),
-                        auth=get_auth())
+        r=requests.put(f"{ctx.obj['base_url']}/content/{ctx.obj['docid']}", 
+                        headers=get_headers(ctx),
+                        data=json.dumps(data))
 
         click.echo(r.text)
 
